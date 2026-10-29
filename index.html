@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ICS / iCalendar Cheat Sheet</title>
+<meta name="description" content="A quick reference for the .ics calendar format: VEVENT fields, RRULE basics, time zones, and import quirks for Google Calendar, Apple Calendar and Outlook.">
+<style>
+  :root{--ink:#1c2330;--mut:#5b6575;--line:#dfe3ea;--bg:#f7f8fa;--card:#ffffff;--acc:#0f62fe}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  main{max-width:760px;margin:0 auto;padding:48px 20px 64px}
+  h1{font-size:2rem;line-height:1.2;margin:0 0 8px}
+  .sub{color:var(--mut);margin:0 0 32px}
+  h2{font-size:1.25rem;margin:40px 0 12px;border-bottom:2px solid var(--line);padding-bottom:6px}
+  table{width:100%;border-collapse:collapse;background:var(--card);font-size:.92rem}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#eef1f5}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88em}
+  code{background:#eef1f5;padding:1px 5px;border-radius:4px}
+  pre{background:#20262e;color:#e8ecf1;padding:14px 16px;border-radius:8px;overflow-x:auto;line-height:1.5}
+  .tip{background:#fff8e6;border-left:4px solid #f1c21b;padding:10px 14px;margin:16px 0;font-size:.95rem}
+  a{color:var(--acc)}
+  footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);color:var(--mut);font-size:.9rem}
+  @media (max-width:600px){ .wide{overflow-x:auto} table{min-width:560px} }
+</style>
+</head>
+<body>
+<main>
+  <h1>ICS / iCalendar Cheat Sheet</h1>
+  <p class="sub">One page on the <code>.ics</code> format Google Calendar, Apple Calendar and Outlook all speak — VEVENT fields, RRULE basics, time zones, and the import quirks that actually bite.</p>
+
+  <h2>Minimal valid event</h2>
+<pre>BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Example//EN
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+UID:shift-42@example.com
+DTSTAMP:20261021T000000Z
+DTSTART:20261022T090000
+DTEND:20261022T170000
+SUMMARY:Day shift
+LOCATION:Warehouse A
+END:VEVENT
+END:VCALENDAR</pre>
+  <p><code>UID</code> must be unique per event. <code>DTSTAMP</code> is when the file was written (UTC with a trailing <code>Z</code>). Without <code>VERSION:2.0</code> and a wrapping <code>VCALENDAR</code>, many importers refuse the file.</p>
+
+  <h2>Fields that survive every importer</h2>
+  <div class="wide">
+  <table>
+    <tr><th>Field</th><th>Meaning</th><th>Gotcha</th></tr>
+    <tr><td><code>SUMMARY</code></td><td>Title</td><td>Escape commas as <code>\,</code></td></tr>
+    <tr><td><code>DTSTART</code> / <code>DTEND</code></td><td>Start / end</td><td>All-day events use date-only: <code>DTSTART;VALUE=DATE:20261022</code></td></tr>
+    <tr><td><code>UID</code></td><td>Stable id</td><td>Reuse the same UID to <em>update</em> an event; change it and you get a duplicate</td></tr>
+    <tr><td><code>DESCRIPTION</code></td><td>Body text</td><td>Newlines as <code>\n</code>; keep it under a few KB</td></tr>
+    <tr><td><code>LOCATION</code></td><td>Place</td><td>Plain text — no nested address structure</td></tr>
+    <tr><td><code>RRULE</code></td><td>Recurrence</td><td>See below; test in the target calendar before bulk import</td></tr>
+  </table>
+  </div>
+
+  <h2>RRULE in one screen</h2>
+  <div class="wide">
+  <table>
+    <tr><th>Need</th><th>Example</th></tr>
+    <tr><td>Every weekday</td><td><code>RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR</code></td></tr>
+    <tr><td>Every 2 weeks on Monday</td><td><code>RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO</code></td></tr>
+    <tr><td>Monthly on the 1st</td><td><code>RRULE:FREQ=MONTHLY;BYMONTHDAY=1</code></td></tr>
+    <tr><td>Stop after 10 times</td><td>add <code>;COUNT=10</code></td></tr>
+    <tr><td>Stop on a date</td><td>add <code>;UNTIL=20261231T235959Z</code></td></tr>
+  </table>
+  </div>
+  <p>Pair <code>RRULE</code> with a floating or TZID-tagged <code>DTSTART</code>. A UTC <code>Z</code> start plus a weekly rule can drift for users in other zones.</p>
+
+  <h2>Time zones</h2>
+  <ul>
+    <li><b>Floating local:</b> <code>DTSTART:20261022T090000</code> — means “9:00 in whatever zone the calendar uses.” Fine for personal schedules.</li>
+    <li><b>Named zone:</b> <code>DTSTART;TZID=America/New_York:20261022T090000</code> — preferred for shared calendars. Include a <code>VTIMEZONE</code> block if you want maximum Outlook compatibility.</li>
+    <li><b>UTC:</b> <code>DTSTART:20261022T130000Z</code> — unambiguous, but night-shift people hate reading Zulu in the UI.</li>
+  </ul>
+
+  <h2>Import quirks worth knowing</h2>
+  <ul>
+    <li><b>Google Calendar:</b> Settings → Import. US-style CSV dates (<code>03/04</code>) are ambiguous; prefer ISO in any CSV→ICS path. RRULE support is good; custom <code>EXDATE</code> lists occasionally drop.</li>
+    <li><b>Apple Calendar:</b> double-click or Mail attachment. All-day events that include a time component show as overnight blocks — use <code>VALUE=DATE</code>.</li>
+    <li><b>Outlook:</b> File → Open &amp; Export → Import/Export. Some builds ignore <code>VALARM</code>; classic Outlook is pickier about missing <code>UID</code>.</li>
+    <li><b>Line folding:</b> RFC 5545 folds lines at 75 octets. A hand-edited file with one giant <code>DESCRIPTION</code> line can fail parsers that enforce the limit.</li>
+  </ul>
+
+  <div class="tip">
+    <b>Building from a spreadsheet?</b> <a href="https://csvtoics.app/" rel="noopener">CSV to ICS Converter</a> maps columns, previews events, and writes a validation report in the browser (nothing uploads). For repeating shifts, see the <a href="https://csvtoics.app/recurring-event-generator" rel="noopener">recurring event generator</a>.
+  </div>
+
+  <footer>
+    Maintained by Casey Marlin · reference only, not affiliated with Google, Apple or Microsoft
+  </footer>
+</main>
+</body>
+</html>
